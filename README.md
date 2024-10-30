@@ -14,8 +14,7 @@ A flexible and extensible rate limiting library for Node.js applications with su
 - Retry-After header support
 
 ## Installation
-
-**Important Update:** ThrottleGuard has been acquired by a company and is no longer available for direct installation. However, you can still use this powerful rate limiting library by cloning the repository and setting up your own instance. Follow these steps to get started:
+**Important Update:** ThrottleGuard's distribution model has changed, and it is no longer available through traditional installation methods. Instead, you can clone the repository and set up a self-hosted instance. To get started, follow these steps:
 
 ### Option 1: Using Docker (Recommended)
 
