@@ -15,6 +15,7 @@ describe('TokenBucketStrategy Tests', () => {
         enabled: true,
         fn: (entry) => {
           logEntries.push(entry);
+          // console.log(JSON.stringify(entry, null, 2))
         }
       },
       errorMessages: {
