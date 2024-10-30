@@ -1,6 +1,5 @@
 # ThrottleGuard - Rate Limiting Library
-
-A flexible and extensible rate limiting library for Node.js applications with support for multiple rate limiting strategies.
+A lightweight and minimal rate limiting library for Node.js applications with support for multiple rate limiting strategies.
 
 ## Features
 
