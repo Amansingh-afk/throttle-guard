@@ -1,15 +1,38 @@
 {
   "name": "throttle-guard",
   "version": "1.0.0",
+  "description": "A flexible and extensible rate limiting library for Node.js applications with support for multiple rate limiting strategies",
   "main": "src/index.js",
   "scripts": {
     "test": "jest",
     "test:watch": "jest --watchAll"
   },
-  "keywords": [],
-  "author": "",
+  "keywords": [
+    "rate-limiting",
+    "throttling",
+    "token-bucket",
+    "sliding-window",
+    "express-middleware",
+    "nodejs",
+    "security",
+    "api-protection",
+    "rate-control"
+  ],
+  "author": {
+    "name": "ThrottleGuard Team",
+    "url": "https://github.com/throttle-guard"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/throttle-guard/throttle-guard.git"
+  },
+  "bugs": {
+    "url": "https://github.com/throttle-guard/throttle-guard/issues"
+  },
   "license": "ISC",
-  "description": "",
+  "engines": {
+    "node": ">=14.0.0"
+  },
   "devDependencies": {
     "jest": "^29.7.0",
     "@babel/core": "^7.25.9",

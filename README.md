@@ -207,11 +207,17 @@ function rateLimitMiddleware(strategyName) {
 ## Configuration Options
 ```javascript
 const guard = new ThrottleGuard({
+    // Logging configuration
     logger: {
         logLevel: 'warn',
-        logFunction: (entry) => console.warn(entry)
+        logFunction: (entry) => {
+            console.warn(`Rate limit exceeded: ${JSON.stringify(entry)}`);
+        }
     },
+    enabled: true  // Enable/disable logging
+    // Skip certain requests from rate limiting (localhost in this case)
     skip: (request) => request.ip === '127.0.0.1',
+    // Custom error messages
     errorMessages: {
         basic: 'Rate limit exceeded. Please try again later.',
         strict: 'Too many requests. Please wait a minute.'

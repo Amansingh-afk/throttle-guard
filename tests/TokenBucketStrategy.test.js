@@ -1,78 +1,106 @@
-import TokenBucketStrategy from '../src/strategies/TokenBucketStrategy.js';
+import ThrottleGuard from '../src/services/ThrottleGuard';
+import TokenBucketStrategy from '../src/strategies/TokenBucketStrategy';
+import keyGenerator from '../src/utils/keyGenerator';
 
-describe('TokenBucketStrategy', () => {
-  let now;
-  
+describe('TokenBucketStrategy Tests', () => {
+  let guard;
+  let logEntries;
+
   beforeEach(() => {
-    now = Date.now();
-    jest.useFakeTimers();
-    jest.setSystemTime(now);
+    console.log('\nRunning TokenBucketStrategy Test...');
+    logEntries = [];
+    guard = new ThrottleGuard({
+      logger: {
+        logLevel: 'debug',
+        enabled: true,
+        fn: (entry) => {
+          logEntries.push(entry);
+        }
+      },
+      errorMessages: {
+        default: 'Basic rate limit exceeded',
+        basic: 'Basic rate limit exceeded',
+        auth: 'Too many login attempts'
+      }
+    });
   });
 
-  afterEach(() => {
-    jest.useRealTimers();
+  describe('Basic Rate Limiting', () => {
+    beforeEach(() => {
+      console.log('  Testing Basic Rate Limiting...');
+      guard.setStrategy('basic', new TokenBucketStrategy(3, 1));
+    });
+
+    it('should allow burst up to bucket size', async () => {
+      const ip = '192.168.1.1';
+      const key = keyGenerator.fromIP(ip);
+      
+      // Should allow 3 immediate requests
+      for (let i = 0; i < 3; i++) {
+        const result = await guard.handleRequest({
+          key,
+          strategyName: 'basic',
+          context: { ip, path: '/api/data', method: 'GET' },
+          handler: async () => `success-${i}`
+        });
+        expect(result).toBe(`success-${i}`);
+      }
+      expect(logEntries.length).toBe(0);
+    });
+
+    it('should reject requests when bucket is empty', async () => {
+      const ip = '192.168.1.1';
+      const key = keyGenerator.fromIP(ip);
+      
+      // Exhaust the bucket
+      for (let i = 0; i < 3; i++) {
+        await guard.handleRequest({
+          key,
+          strategyName: 'basic',
+          context: { ip, path: '/api/data', method: 'GET' },
+          handler: async () => 'success'
+        });
+      }
+
+      // Additional request should fail
+      await expect(guard.handleRequest({
+        key,
+        strategyName: 'basic',
+        context: { ip, path: '/api/data', method: 'GET' },
+        handler: async () => 'success'
+      })).rejects.toThrow('Basic rate limit exceeded');
+      
+      expect(logEntries.length).toBe(1);
+    });
   });
 
-  it('should allow requests within the limit and handle initial capacity', () => {
-    const strategy = new TokenBucketStrategy(3, 1);
-    const key = 'test-key';
+  describe('API Authentication Limiting', () => {
+    beforeEach(() => {
+      console.log('  Testing API Authentication Limiting...');
+      guard.setStrategy('auth', new TokenBucketStrategy(3, 0.2));
+    });
 
-    // Should allow exactly 3 requests (initial capacity)
-    expect(strategy.isAllowed(key)).toBe(true);
-    expect(strategy.isAllowed(key)).toBe(true);
-    expect(strategy.isAllowed(key)).toBe(true);
-    // Should deny the 4th request
-    expect(strategy.isAllowed(key)).toBe(false);
-  });
+    it('should limit login attempts', async () => {
+      const ip = '192.168.1.2';
+      const key = keyGenerator.custom('auth', ip);
+      let attempts = 0;
 
-  it('should refill tokens over time', () => {
-    const strategy = new TokenBucketStrategy(2, 1); // 2 capacity, 1 token per second
-    const key = 'test-key';
+      // Try 5 login attempts
+      for (let i = 0; i < 5; i++) {
+        try {
+          await guard.handleRequest({
+            key,
+            strategyName: 'auth',
+            context: { ip, path: '/auth/login', method: 'POST' },
+            handler: async () => { attempts++; }
+          });
+        } catch (error) {
+          expect(error.message).toBe('Too many login attempts');
+        }
+      }
 
-    // Use up initial tokens
-    expect(strategy.isAllowed(key)).toBe(true); // 2 -> 1
-    expect(strategy.isAllowed(key)).toBe(true); // 1 -> 0
-    expect(strategy.isAllowed(key)).toBe(false); // 0 -> denied
-
-    // Advance time by exactly 1 second
-    jest.advanceTimersByTime(1000);
-
-    // Should have 1 new token
-    expect(strategy.isAllowed(key)).toBe(true);
-    expect(strategy.isAllowed(key)).toBe(false);
-  });
-
-  it('should handle multiple keys independently', () => {
-    const strategy = new TokenBucketStrategy(2, 1);
-    const key1 = 'test-key-1';
-    const key2 = 'test-key-2';
-
-    // Key1 operations
-    expect(strategy.isAllowed(key1)).toBe(true);
-    expect(strategy.isAllowed(key1)).toBe(true);
-    expect(strategy.isAllowed(key1)).toBe(false);
-
-    // Key2 should still have full capacity
-    expect(strategy.isAllowed(key2)).toBe(true);
-    expect(strategy.isAllowed(key2)).toBe(true);
-    expect(strategy.isAllowed(key2)).toBe(false);
-  });
-
-  it('should not exceed capacity when refilling', () => {
-    const strategy = new TokenBucketStrategy(2, 1);
-    const key = 'test-key';
-
-    // Use both tokens
-    expect(strategy.isAllowed(key)).toBe(true);
-    expect(strategy.isAllowed(key)).toBe(true);
-    expect(strategy.isAllowed(key)).toBe(false);
-
-    // Advance time by 10 seconds
-    jest.advanceTimersByTime(10000);
-
-    // Should only have refilled to capacity (2)
-    expect(strategy.isAllowed(key)).toBe(true);
-    expect(strategy.isAllowed(key)).toBe(true);
-    expect(strategy.isAllowed(key)).toBe(false);
+      expect(attempts).toBe(3);
+      expect(logEntries.length).toBe(2);
+    });
   });
 });

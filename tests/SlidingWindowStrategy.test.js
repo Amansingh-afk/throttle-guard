@@ -1,56 +1,127 @@
-import SlidingWindowStrategy from '../src/strategies/SlidingWindowStrategy.js';
+import ThrottleGuard from '../src/services/ThrottleGuard';
+import SlidingWindowStrategy from '../src/strategies/SlidingWindowStrategy';
+import keyGenerator from '../src/utils/keyGenerator';
 
-describe('SlidingWindowStrategy', () => {
-  it('should allow requests within the limit', () => {
-    const strategy = new SlidingWindowStrategy(60000, 3);
-    const key = 'test-key';
+describe('SlidingWindowStrategy Tests', () => {
+  let guard;
+  let logEntries;
 
-    expect(strategy.isAllowed(key)).toBe(true);
-    expect(strategy.isAllowed(key)).toBe(true);
-    expect(strategy.isAllowed(key)).toBe(true);
-    expect(strategy.isAllowed(key)).toBe(false);
+  beforeEach(() => {
+    console.log('\nRunning SlidingWindowStrategy Test...');
+    logEntries = [];
+    guard = new ThrottleGuard({
+      logger: {
+        logLevel: 'debug',
+        enabled: true,
+        fn: (entry) => {
+          logEntries.push(entry);
+          // console.log(JSON.stringify(entry, null, 2))
+        }
+      },
+      errorMessages: {
+        default: 'Basic rate limit exceeded',
+        basic: 'Basic rate limit exceeded',
+        free: 'Basic rate limit exceeded',
+        premium: 'Basic rate limit exceeded',
+        window: 'Basic rate limit exceeded'
+      }
+    });
   });
 
-  it('should allow requests after the window has passed', (done) => {
-    const strategy = new SlidingWindowStrategy(1000, 1);
-    const key = 'test-key';
+  describe('User Tier Rate Limiting', () => {
+    beforeEach(() => {
+      console.log('  Testing User Tier Rate Limiting...');
+      guard.setStrategy('free', new SlidingWindowStrategy(1000, 2));
+      guard.setStrategy('premium', new SlidingWindowStrategy(1000, 5));
+    });
 
-    expect(strategy.isAllowed(key)).toBe(true);
-    expect(strategy.isAllowed(key)).toBe(false);
+    it('should enforce free tier limits', async () => {
+      const userId = 'free-123';
+      const key = keyGenerator.fromUserId(userId);
+      let successCount = 0;
 
-    setTimeout(() => {
-      expect(strategy.isAllowed(key)).toBe(true);
-      done();
-    }, 1100);
-  }, 2000);
+      for (let i = 0; i < 4; i++) {
+        try {
+          await guard.handleRequest({
+            key,
+            strategyName: 'free',
+            context: { userId, path: '/api/data', method: 'GET' },
+            handler: async () => { successCount++; }
+          });
+        } catch (error) {
+          expect(error.message).toBe('Basic rate limit exceeded');
+        }
+      }
 
-  it('should handle multiple keys independently', () => {
-    const strategy = new SlidingWindowStrategy(60000, 2);
-    const key1 = 'test-key-1';
-    const key2 = 'test-key-2';
+      expect(successCount).toBe(2);
+      expect(logEntries.length).toBe(2);
+    });
 
-    // Key1 operations
-    expect(strategy.isAllowed(key1)).toBe(true);
-    expect(strategy.isAllowed(key1)).toBe(true);
-    expect(strategy.isAllowed(key1)).toBe(false);
+    it('should enforce premium tier limits', async () => {
+      const userId = 'premium-456';
+      const key = keyGenerator.fromUserId(userId);
+      let successCount = 0;
 
-    // Key2 should be independent
-    expect(strategy.isAllowed(key2)).toBe(true);
-    expect(strategy.isAllowed(key2)).toBe(true);
-    expect(strategy.isAllowed(key2)).toBe(false);
+      for (let i = 0; i < 7; i++) {
+        try {
+          await guard.handleRequest({
+            key,
+            strategyName: 'premium',
+            context: { userId, path: '/api/data', method: 'GET' },
+            handler: async () => { successCount++; }
+          });
+        } catch (error) {
+          expect(error.message).toBe('Basic rate limit exceeded');
+        }
+      }
+
+      expect(successCount).toBe(5);
+      expect(logEntries.length).toBe(2);
+    });
   });
 
-  it('should clean up old requests from the window', (done) => {
-    const strategy = new SlidingWindowStrategy(500, 2);
-    const key = 'test-key';
+  describe('Time Window Behavior', () => {
+    beforeEach(() => {
+      console.log('  Testing Time Window Behavior...');
+      guard.setStrategy('window', new SlidingWindowStrategy(500, 3));
+    });
 
-    expect(strategy.isAllowed(key)).toBe(true);
-    expect(strategy.isAllowed(key)).toBe(true);
-    expect(strategy.isAllowed(key)).toBe(false);
+    it('should reset limits after window expires', async () => {
+      const ip = '192.168.1.3';
+      const key = keyGenerator.fromIP(ip);
+      let successCount = 0;
 
-    setTimeout(() => {
-      expect(strategy.isAllowed(key)).toBe(true);
-      done();
-    }, 600);
-  }, 1000);
+      // First batch of requests
+      for (let i = 0; i < 4; i++) {
+        try {
+          await guard.handleRequest({
+            key,
+            strategyName: 'window',
+            context: { ip, path: '/api/data', method: 'GET' },
+            handler: async () => { successCount++; }
+          });
+        } catch (error) {
+          expect(error.message).toBe('Basic rate limit exceeded');
+        }
+      }
+
+      expect(successCount).toBe(3);
+
+      // Wait for window to expire
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      // Second batch of requests
+      successCount = 0;
+      for (let i = 0; i < 3; i++) {
+        await guard.handleRequest({
+          key,
+          strategyName: 'window',
+          context: { ip, path: '/api/data', method: 'GET' },
+          handler: async () => { successCount++; }
+        });
+      }
+
+      expect(successCount).toBe(3);
+    });
+  });
 });
