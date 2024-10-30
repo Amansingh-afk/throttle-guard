@@ -68,16 +68,3 @@ temp/
 Dockerfile*
 docker-compose*
 .docker
-
-# Optional: TypeScript
-*.tsbuildinfo
-
-# Optional: Next.js
-.next/
-out/
-
-# Optional: Nuxt.js
-.nuxt/
-
-# Optional: Gatsby
-.cache/

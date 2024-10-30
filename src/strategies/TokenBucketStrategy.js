@@ -1,61 +1,61 @@
 import RateLimitStrategy from './RateLimitStrategy.js';
 
+/** @implements {import('../types.js').RateLimitStrategy} */
 class TokenBucketStrategy extends RateLimitStrategy {
-    constructor(capacity, refillRate) {
-        super();
-        this.capacity = capacity;
-        this.refillRate = refillRate;
-        this.tokens = new Map();
-        this.lastRefillTimestamp = new Map();
-    }
+  /**
+   * @param {number} capacity - Maximum tokens
+   * @param {number} refillRate - Tokens per second
+   */
+  constructor(capacity, refillRate) {
+    super();
+    this.capacity = capacity;
+    this.refillRate = refillRate;
+    /** @type {Map<string, import('../types.js').Bucket>} */
+    this.buckets = new Map();
+  }
 
-    refillTokens(key) {
-        const now = Date.now();
-        
-        // Initialize tokens and timestamp if not exists
-        if (!this.tokens.has(key)) {
-            this.tokens.set(key, this.capacity);
-            this.lastRefillTimestamp.set(key, now);
-            return this.tokens.get(key);
-        }
+  /**
+   * @param {string} key
+   * @returns {boolean}
+   */
+  isAllowed(key) {
+    const now = Date.now();
+    const bucket = this.#getBucket(key, now);
+    
+    if (bucket.tokens < 1) return false;
+    
+    bucket.tokens--;
+    this.buckets.set(key, bucket);
+    return true;
+  }
 
-        const lastRefill = this.lastRefillTimestamp.get(key);
-        const timePassed = (now - lastRefill) / 1000; // Convert to seconds
-        
-        let currentTokens = this.tokens.get(key);
-        
-        // Calculate new tokens
-        const newTokens = timePassed * this.refillRate;
-        currentTokens = Math.min(
-            this.capacity,
-            currentTokens + newTokens
-        );
+  /**
+   * @param {string} key
+   * @returns {number}
+   */
+  getRetryAfter(key) {
+    const bucket = this.buckets.get(key);
+    if (!bucket) return 0;
+    
+    return Math.ceil((1 - bucket.tokens) * (1000 / this.refillRate));
+  }
 
-        // Update state
-        this.tokens.set(key, currentTokens);
-        this.lastRefillTimestamp.set(key, now);
-        
-        return currentTokens;
-    }
-
-    isAllowed(key) {
-        const currentTokens = this.refillTokens(key);
-        
-        if (currentTokens >= 1) {
-            this.tokens.set(key, currentTokens - 1);
-            return true;
-        }
-        
-        return false;
-    }
-
-    getRetryAfter(key) {
-        const currentTokens = this.tokens.get(key) || 0;
-        if (currentTokens >= 1) return 0;
-        
-        const timeNeeded = (1 - currentTokens) / this.refillRate;
-        return Math.ceil(timeNeeded * 1000); // Return milliseconds
-    }
+  /**
+   * @private
+   * @param {string} key
+   * @param {number} now
+   * @returns {import('../types.js').Bucket}
+   */
+  #getBucket(key, now) {
+    const bucket = this.buckets.get(key) || { tokens: this.capacity, lastRefill: now };
+    const timePassed = now - bucket.lastRefill;
+    const refill = (timePassed * this.refillRate) / 1000;
+    
+    bucket.tokens = Math.min(this.capacity, bucket.tokens + refill);
+    bucket.lastRefill = now;
+    
+    return bucket;
+  }
 }
 
 export default TokenBucketStrategy;

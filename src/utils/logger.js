@@ -1,14 +1,26 @@
+/** @implements {import('../types.js').Logger} */
 class RateLimitLogger {
+    /**
+     * @param {import('../types.js').LoggerOptions} [options]
+     */
     constructor(options = {}) {
         this.options = {
-            logLevel: 'warn',
-            logFunction: console.log,
+            level: 'warn',
+            enabled: true,
+            fn: console.log,
             ...options
         };
     }
 
+    /**
+     * @param {import('../errors/RateLimitError.js').default} error
+     * @param {import('../types.js').RequestContext} [request]
+     * @returns {import('../types.js').LogEntry}
+     */
     log(error, request) {
-        const logEntry = {
+        if (!this.options.enabled) return;
+
+        const entry = {
             timestamp: new Date().toISOString(),
             type: error.name,
             message: error.message,
@@ -19,8 +31,8 @@ class RateLimitLogger {
             metadata: error.metadata
         };
 
-        this.options.logFunction(logEntry);
-        return logEntry;
+        this.options.fn(entry);
+        return entry;
     }
 }
 
