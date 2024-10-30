@@ -213,7 +213,7 @@ const guard = new ThrottleGuard({
         logFunction: (entry) => {
             console.warn(`Rate limit exceeded: ${JSON.stringify(entry)}`);
         }
-    enabled: true  // Enable/disable logging
+        enabled: true  // Enable/disable logging
     },
     // Skip certain requests from rate limiting (localhost in this case)
     skip: (request) => request.ip === '127.0.0.1',
