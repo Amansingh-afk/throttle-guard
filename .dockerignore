@@ -5,9 +5,14 @@
 
 # Dependencies
 node_modules
-npm-debug.log
-yarn-debug.log
-yarn-error.log
+.pnpm-store
+.npm
+.yarn
+
+# Package manager files
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
 
 # Testing
 coverage
@@ -20,21 +25,30 @@ build
 
 # Development files
 .editorconfig
-.eslintrc
-.prettierrc
+.eslintrc*
+.prettierrc*
+.eslintcache
 *.md
 !README.md
 
 # Environment variables
-.env
-.env.*
+.env*
 
 # IDE and editor files
 .idea
 .vscode
+*.sublime-*
 *.swp
 *.swo
+*~
+
+# OS generated files
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
 Thumbs.db
 
 # Documentation
@@ -45,6 +59,7 @@ examples/
 # Temporary files
 tmp/
 temp/
+.tmp/
 
 # Debug files
 .debug/
@@ -53,3 +68,16 @@ temp/
 Dockerfile*
 docker-compose*
 .docker
+
+# Optional: TypeScript
+*.tsbuildinfo
+
+# Optional: Next.js
+.next/
+out/
+
+# Optional: Nuxt.js
+.nuxt/
+
+# Optional: Gatsby
+.cache/
